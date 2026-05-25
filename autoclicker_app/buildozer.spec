@@ -11,10 +11,10 @@ requirements = python3,kivy,Pillow,numpy,pyjnius,android
 
 # 权限
 android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,SYSTEM_ALERT_WINDOW,FOREGROUND_SERVICE
-android.api = 31
-android.minapi = 21
-android.ndk = 23b
-android.sdk = 31
+android.api = 34
+android.minapi = 24
+android.ndk = 25b
+android.accept_sdk_license = True
 
 # 编译架构
 android.archs = arm64-v8a,armeabi-v7a
