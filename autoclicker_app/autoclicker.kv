@@ -1,0 +1,297 @@
+#:kivy 2.0
+
+<MainScreen>:
+    name: 'main'
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(10)
+        spacing: dp(10)
+
+        # 标题栏
+        BoxLayout:
+            size_hint_y: 0.08
+            spacing: dp(10)
+
+            Label:
+                text: 'AutoClicker'
+                font_size: '24sp'
+                bold: True
+                size_hint_x: 0.6
+                halign: 'left'
+                text_size: self.size
+
+            # 状态指示器
+            BoxLayout:
+                size_hint_x: 0.4
+                orientation: 'horizontal'
+                spacing: dp(5)
+
+                Canvas:
+                    Color:
+                        rgba: root.status_color
+                    Ellipse:
+                        pos: self.pos
+                        size: (dp(12), dp(12))
+
+                Label:
+                    text: root.status_text
+                    font_size: '16sp'
+                    color: root.status_color
+
+        # 控制按钮
+        BoxLayout:
+            size_hint_y: 0.07
+            spacing: dp(5)
+
+            Button:
+                text: '▶ 开始'
+                background_color: (0.2, 0.8, 0.2, 1)
+                on_press: root.start_auto()
+
+            Button:
+                text: '⏸ 暂停'
+                background_color: (0.8, 0.8, 0.2, 1)
+                on_press: root.pause_auto()
+
+            Button:
+                text: '▶ 继续'
+                background_color: (0.2, 0.5, 0.8, 1)
+                on_press: root.resume_auto()
+
+            Button:
+                text: '■ 停止'
+                background_color: (0.8, 0.2, 0.2, 1)
+                on_press: root.stop_auto()
+
+        # 状态信息
+        BoxLayout:
+            size_hint_y: 0.06
+            spacing: dp(20)
+
+            Label:
+                text: '翻页次数:'
+                size_hint_x: 0.3
+
+            Label:
+                text: str(root.scroll_count)
+                size_hint_x: 0.2
+                bold: True
+
+            Label:
+                text: '最近操作:'
+                size_hint_x: 0.2
+
+            Label:
+                text: root.last_action
+                size_hint_x: 0.3
+                text_size: self.size
+                shorten: True
+
+        # 日志区域
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint_y: 0.6
+
+            BoxLayout:
+                size_hint_y: 0.1
+                spacing: dp(5)
+
+                Label:
+                    text: '运行日志'
+                    font_size: '16sp'
+                    bold: True
+                    size_hint_x: 0.7
+                    halign: 'left'
+                    text_size: self.size
+
+                Button:
+                    text: '清空'
+                    size_hint_x: 0.15
+                    on_press: root.clear_log()
+
+                Button:
+                    text: '配置'
+                    size_hint_x: 0.15
+                    on_press: app.root.current = 'config'
+
+            ScrollView:
+                size_hint_y: 0.9
+
+                TextInput:
+                    id: log_display
+                    text: root.log_text
+                    readonly: True
+                    font_size: '12sp'
+                    background_color: (0.1, 0.1, 0.1, 1)
+                    foreground_color: (0, 1, 0, 1)
+                    font_name: 'Consolas'
+
+        # 底部提示
+        Label:
+            size_hint_y: 0.03
+            text: '确保已连接设备并授予必要权限'
+            font_size: '10sp'
+            color: (0.5, 0.5, 0.5, 1)
+
+
+<ConfigScreen>:
+    name: 'config'
+
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(15)
+        spacing: dp(8)
+
+        # 标题
+        BoxLayout:
+            size_hint_y: 0.07
+            spacing: dp(10)
+
+            Label:
+                text: '配置'
+                font_size: '22sp'
+                bold: True
+                size_hint_x: 0.6
+                halign: 'left'
+                text_size: self.size
+
+            Button:
+                text: '← 返回'
+                size_hint_x: 0.2
+                on_press: app.root.current = 'main'
+
+            Button:
+                text: '保存'
+                size_hint_x: 0.2
+                background_color: (0.2, 0.6, 0.2, 1)
+                on_press: root.save_config()
+
+        ScrollView:
+            size_hint_y: 0.93
+
+            BoxLayout:
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(10)
+                padding: dp(10)
+
+                # ── 颜色检测 ──
+                Label:
+                    text: '颜色检测'
+                    font_size: '16sp'
+                    bold: True
+                    size_hint_y: None
+                    height: dp(30)
+                    halign: 'left'
+                    text_size: self.size
+
+                GridLayout:
+                    cols: 2
+                    size_hint_y: None
+                    height: dp(40)
+                    spacing: dp(5)
+
+                    Label:
+                        text: '主要检测颜色:'
+                    Spinner:
+                        id: color_spinner
+                        text: '红色'
+                        on_text: root.on_color_selected(self, self.text)
+
+                GridLayout:
+                    cols: 2
+                    size_hint_y: None
+                    height: dp(80)
+                    spacing: dp(5)
+
+                    Label:
+                        text: '目标颜色列表:'
+                        text_size: self.size
+                        halign: 'left'
+                        valign: 'top'
+
+                    TextInput:
+                        id: color_targets_input
+                        text: '红色, 绿色, 蓝色, 橙色, 黄色'
+                        multiline: False
+                        hint_text: '逗号分隔'
+
+                # ── 时间参数 ──
+                Label:
+                    text: '时间参数'
+                    font_size: '16sp'
+                    bold: True
+                    size_hint_y: None
+                    height: dp(30)
+                    halign: 'left'
+                    text_size: self.size
+
+                GridLayout:
+                    cols: 2
+                    size_hint_y: None
+                    height: dp(40)
+                    spacing: dp(5)
+
+                    Label:
+                        text: '检测间隔(秒):'
+                    TextInput:
+                        id: interval_input
+                        text: '1.0'
+                        multiline: False
+                        input_filter: 'float'
+
+                    Label:
+                        text: '翻页间隔(秒):'
+                    TextInput:
+                        id: scroll_interval_input
+                        text: '2.0'
+                        multiline: False
+                        input_filter: 'float'
+
+                    Label:
+                        text: '最大翻页次数:'
+                    TextInput:
+                        id: max_scrolls_input
+                        text: '50'
+                        multiline: False
+                        input_filter: 'int'
+
+                # ── 连接设置 ──
+                Label:
+                    text: '连接设置'
+                    font_size: '16sp'
+                    bold: True
+                    size_hint_y: None
+                    height: dp(30)
+                    halign: 'left'
+                    text_size: self.size
+
+                GridLayout:
+                    cols: 2
+                    size_hint_y: None
+                    height: dp(40)
+                    spacing: dp(5)
+
+                    Label:
+                        text: '后端模式:'
+                    Spinner:
+                        id: backend_spinner
+                        text: app.config_data.get('backend', 'mock')
+                        values: ['mock', 'adb', 'android']
+                        on_text: root.set_backend(self.text)
+
+                GridLayout:
+                    cols: 2
+                    size_hint_y: None
+                    height: dp(40)
+                    spacing: dp(5)
+
+                    Label:
+                        text: 'ADB 设备号:'
+                    TextInput:
+                        id: adb_device_input
+                        text: app.config_data.get('adb_device', '')
+                        multiline: False
+                        hint_text: '留空使用默认设备'
+                        on_text: app.config_data['adb_device'] = self.text
