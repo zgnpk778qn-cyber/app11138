@@ -26,12 +26,10 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq \
-            python3-pip python3-dev python3-venv \
-            libssl-dev libffi-dev wget unzip file \
-            git autoconf automake autopoint libtool \
-            pkg-config ccache cmake \
-            openjdk-17-jdk zlib1g-dev libltdl-dev
+          sudo apt-get install -y -qq python3-pip python3-dev python3-venv \
+            libssl-dev libffi-dev wget unzip file git autoconf automake \
+            autopoint libtool pkg-config ccache cmake openjdk-17-jdk \
+            zlib1g-dev libltdl-dev
 
       - name: Increase swap space
         run: |
@@ -53,26 +51,31 @@ jobs:
           path: |
             ~/.buildozer
             autoclicker_app/.buildozer
-          key: ${{ runner.os }}-buildozer-v5-${{ hashFiles('autoclicker_app/buildozer.spec') }}
+          key: ${{ runner.os }}-buildozer-v6-${{ hashFiles('autoclicker_app/buildozer.spec') }}
 
       - name: Build APK
+        timeout-minutes: 35
         env:
           SETUPTOOLS_USE_DISTUTILS: stdlib
         run: |
           set -eo pipefail
-          buildozer android debug --verbose 2>&1 | tee build.log
-          echo "BUILD_EXIT_CODE=0" >> $GITHUB_ENV
+          buildozer android debug 2>&1 | tee build.log | tail -50
+          echo "=== buildozer exit: $? ==="
 
-      - name: Locate APK
+      - name: Show build result
         if: always()
         run: |
-          echo "=== Searching all APK files ==="
-          find /home/runner/work -name "*.apk" -type f 2>/dev/null || echo "None found in work dir"
-          find /tmp -name "*.apk" -type f 2>/dev/null || echo "None found in /tmp"
-          echo "=== bin directory ==="
-          ls -laR bin/ 2>/dev/null || echo "No bin/"
-          echo "=== dists directory ==="
-          ls -laR .buildozer/android/platform/build-*/dists/ 2>/dev/null || echo "No dists/"
+          echo "=== Last 80 lines of build log ==="
+          tail -80 build.log || echo "no build.log"
+          echo "=== Searching for APK files ==="
+          find . -name "*.apk" -type f 2>/dev/null
+          find /home/runner -name "*.apk" -type f 2>/dev/null
+          find /tmp -name "*.apk" -type f 2>/dev/null
+          echo "=== Listing dists directories ==="
+          find .buildozer -type d -name "dists" 2>/dev/null
+          find .buildozer -type d -name "bin" 2>/dev/null
+          echo "=== .buildozer structure (top 3 levels) ==="
+          find .buildozer -maxdepth 3 -type d 2>/dev/null | head -40
 
       - name: Upload APK
         if: always()
@@ -80,9 +83,10 @@ jobs:
         with:
           name: autoclicker-apk
           path: |
-            /home/runner/work/**/*.apk
             autoclicker_app/bin/*.apk
-            autoclicker_app/.buildozer/**/bin/*.apk
+            autoclicker_app/*.apk
+            autoclicker_app/.buildozer/**/*.apk
+            /home/runner/work/**/*.apk
           if-no-files-found: warn
           overwrite: true
 
@@ -93,6 +97,5 @@ jobs:
           name: build-log
           path: |
             autoclicker_app/build.log
-            autoclicker_app/.buildozer/logs/*.log
           if-no-files-found: warn
           overwrite: true
