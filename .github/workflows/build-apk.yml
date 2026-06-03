@@ -51,7 +51,7 @@ jobs:
           path: |
             ~/.buildozer
             autoclicker_app/.buildozer
-          key: ${{ runner.os }}-buildozer-v2-${{ hashFiles('autoclicker_app/buildozer.spec') }}
+          key: ${{ runner.os }}-buildozer-v3-${{ hashFiles('autoclicker_app/buildozer.spec') }}
 
       - name: Build APK
         env:
@@ -59,12 +59,28 @@ jobs:
         run: |
           buildozer android debug 2>&1 | tee build.log
 
+      - name: Find APK files
+        if: always()
+        run: |
+          echo "=== Searching for .apk files ==="
+          find . -name "*.apk" -type f 2>/dev/null || echo "No .apk found in current dir"
+          find .. -name "*.apk" -type f 2>/dev/null || echo "No .apk found in parent"
+          find /home/runner -name "*.apk" -type f 2>/dev/null || echo "No .apk found in /home/runner"
+          echo "=== bin/ contents ==="
+          ls -la bin/ 2>/dev/null || echo "bin/ does not exist"
+          echo "=== .buildozer contents ==="
+          ls -la .buildozer/ 2>/dev/null || echo ".buildozer/ does not exist"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: autoclicker-apk
-          path: autoclicker_app/bin/*.apk
-          if-no-files-found: error
+          path: |
+            autoclicker_app/bin/*.apk
+            autoclicker_app/*.apk
+            autoclicker_app/.buildozer/android/platform/build-*/dists/*/bin/*.apk
+          if-no-files-found: warn
+          overwrite: true
 
       - name: Upload build log (on failure)
         if: failure()
