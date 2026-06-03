@@ -6,7 +6,7 @@ package.name = autoclicker
 package.domain = org.autoclicker
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
-version = 1.0.0
+version = 1.0.1
 requirements = python3,kivy,Pillow,numpy,pyjnius,android
 
 # 权限
@@ -16,8 +16,8 @@ android.minapi = 24
 android.ndk = 25b
 android.accept_sdk_license = True
 
-# 编译架构
-android.archs = arm64-v8a,armeabi-v7a
+# 编译架构 - 仅 arm64 减少构建时间和内存
+android.archs = arm64-v8a
 
 # 图标
 android.icon = icon.png
@@ -33,10 +33,6 @@ android.sdk_path =
 # 默认布局
 orientation = portrait
 fullscreen = 0
-
-# Tesseract 集成（通过自定义 recipe）
-# 注意：需要在 .buildozer/android/platform/build-*/recipes 下添加 tesseract recipe
-# 或者使用预编译的 tesseract 二进制文件
 
 [buildozer]
 
