@@ -4,6 +4,9 @@ on:
   push:
     branches: [ main ]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -51,25 +54,18 @@ jobs:
           path: |
             ~/.buildozer
             autoclicker_app/.buildozer
-          key: ${{ runner.os }}-buildozer-v3-${{ hashFiles('autoclicker_app/buildozer.spec') }}
+          key: ${{ runner.os }}-buildozer-v4-${{ hashFiles('autoclicker_app/buildozer.spec') }}
 
       - name: Build APK
         env:
           SETUPTOOLS_USE_DISTUTILS: stdlib
         run: |
           buildozer android debug 2>&1 | tee build.log
-
-      - name: Find APK files
-        if: always()
-        run: |
-          echo "=== Searching for .apk files ==="
-          find . -name "*.apk" -type f 2>/dev/null || echo "No .apk found in current dir"
-          find .. -name "*.apk" -type f 2>/dev/null || echo "No .apk found in parent"
-          find /home/runner -name "*.apk" -type f 2>/dev/null || echo "No .apk found in /home/runner"
-          echo "=== bin/ contents ==="
+          echo "=== Build exit code: $? ==="
+          echo "=== Looking for APK ==="
+          find . -name "*.apk" -type f 2>/dev/null || echo "No .apk in ."
+          find /home/runner -name "*.apk" -type f 2>/dev/null || echo "No .apk in /home/runner"
           ls -la bin/ 2>/dev/null || echo "bin/ does not exist"
-          echo "=== .buildozer contents ==="
-          ls -la .buildozer/ 2>/dev/null || echo ".buildozer/ does not exist"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -82,9 +78,11 @@ jobs:
           if-no-files-found: warn
           overwrite: true
 
-      - name: Upload build log (on failure)
-        if: failure()
+      - name: Upload build log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-log
           path: autoclicker_app/build.log
+          if-no-files-found: warn
+          overwrite: true
