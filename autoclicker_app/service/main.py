@@ -1,13 +1,13 @@
 """
 AutoClicker Service — 后台前台服务：截图 → 颜色+文字匹配 → 点击 → 上滑
+纯 Python 实现，无 numpy 依赖
 """
 import os
 import time
-import threading
+import math
 import subprocess
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
-import numpy as np
 
 CFG = '/data/data/org.autoclicker.autoclicker/files/service_cfg.txt'
 
@@ -25,15 +25,14 @@ TARGET_CHARS = ['是', '否', '对', '错', '和', '或', 'y', 'e', 's', 'n', 'o
 
 
 # ============================================================
-#  轻量 OCR：字体渲染 + NCC 模板匹配
+#  轻量 OCR：字体渲染 + NCC 模板匹配（纯 Python，0 外部依赖）
 # ============================================================
 class TextMatcher:
-    """对指定字符集做模板匹配，不依赖外部 OCR 库"""
 
     FONT_SIZES = [28, 36, 48, 60]
 
     def __init__(self):
-        self._templates = {}   # char -> [(h,w, array), ...]
+        self._templates = {}   # char -> [(w, h, pixels_list), ...]
         font = self._find_font()
         if font:
             for char in TARGET_CHARS:
@@ -47,7 +46,6 @@ class TextMatcher:
         self.ready = len(self._templates) > 0
 
     def _find_font(self):
-        """Find a CJK-capable font on Android"""
         candidates = [
             '/system/fonts/NotoSansCJK-Regular.ttc',
             '/system/fonts/NotoSansSC-Regular.otf',
@@ -74,42 +72,48 @@ class TextMatcher:
         img = Image.new('L', (cw + pad * 2, ch + pad * 2), 255)
         draw = ImageDraw.Draw(img)
         draw.text((pad - bbox[0], pad - bbox[1]), char, fill=0, font=font)
-        return np.array(img, dtype=np.float32)
+        # Store as (width, height, flat_float_list)
+        pixels = list(img.getdata())  # 0-255 ints
+        return (img.width, img.height, [float(p) for p in pixels])
 
-    def scan(self, gray_img, threshold=0.50):
+    def scan(self, gray_pil, threshold=0.50):
         """
-        在灰度图上扫描所有目标字。
+        在灰度 PIL Image 上扫描所有目标字。
         返回: [(char, x, y, w, h, score), ...]
         """
         if not self.ready:
             return []
-        h_img, w_img = gray_img.shape
+        w_img, h_img = gray_pil.size
         matches = []
         for char, templates in self._templates.items():
-            for tmpl in templates:
-                th, tw = tmpl.shape
+            for tw, th, tpixels in templates:
                 if th > h_img or tw > w_img:
                     continue
                 stride = max(3, tw // 4)
                 for y in range(0, h_img - th + 1, stride):
                     for x in range(0, w_img - tw + 1, stride):
-                        patch = gray_img[y:y + th, x:x + tw]
-                        if patch.shape != (th, tw):
-                            continue
-                        score = self._ncc(patch, tmpl)
+                        patch = gray_pil.crop((x, y, x + tw, y + th))
+                        ppixels = [float(p) for p in patch.getdata()]
+                        score = self._ncc(ppixels, tpixels)
                         if score >= threshold:
                             matches.append((char, x, y, tw, th, score))
         return self._nms(matches)
 
     @staticmethod
     def _ncc(a, b):
-        a_flat = a.ravel()
-        b_flat = b.ravel()
-        a_m, b_m = a_flat.mean(), b_flat.mean()
-        a_s, b_s = a_flat.std(), b_flat.std()
+        n = len(a)
+        if n == 0:
+            return 0.0
+        a_m = sum(a) / n
+        b_m = sum(b) / n
+        # std
+        a_s = math.sqrt(sum((v - a_m) ** 2 for v in a) / n)
+        b_s = math.sqrt(sum((v - b_m) ** 2 for v in b) / n)
         if a_s < 1e-6 or b_s < 1e-6:
             return 0.0
-        return float(np.dot((a_flat - a_m) / a_s, (b_flat - b_m) / b_s) / len(a_flat))
+        # dot product of normalized vectors
+        dot = sum((a[i] - a_m) / a_s * (b[i] - b_m) / b_s for i in range(n))
+        return dot / n
 
     @staticmethod
     def _nms(matches, iou_thresh=0.3):
@@ -136,24 +140,21 @@ class TextMatcher:
                 kept.append(m)
         return kept
 
-    def match_word(self, gray_img, word, threshold=0.45):
-        """检查图像中是否包含目标词语（连续相邻的字符匹配）"""
-        chars = self.scan(gray_img, threshold=threshold)
+    def match_word(self, gray_pil, word, threshold=0.45):
+        """检查图像中是否包含目标词语"""
+        chars = self.scan(gray_pil, threshold=threshold)
         if len(chars) < len(word):
             return False, None
-        # Sort by x position
         chars.sort(key=lambda c: c[1])
-        # Slide window looking for consecutive matching chars
         for i in range(len(chars) - len(word) + 1):
             segment = chars[i:i + len(word)]
             seg_word = ''.join(c[0] for c in segment)
             if seg_word == word:
-                # Check if chars are adjacent (no large gaps)
                 ok = True
                 for j in range(1, len(segment)):
                     prev_right = segment[j - 1][1] + segment[j - 1][3]
                     gap = segment[j][1] - prev_right
-                    if gap > segment[j][3] * 2:  # gap > 2x char width
+                    if gap > segment[j][3] * 2:
                         ok = False
                         break
                 if ok:
@@ -167,7 +168,7 @@ class TextMatcher:
 
 
 # ============================================================
-#  颜色检测
+#  颜色检测（纯 PIL）
 # ============================================================
 def find_color(img, color_name):
     lo, hi = COLOR_RANGES.get(color_name, COLOR_RANGES['红'])
@@ -222,7 +223,6 @@ def tap(x, y):
 
 
 def scroll_up():
-    """上滑"""
     subprocess.run(
         ['input', 'swipe', '540', '1200', '540', '350', '400'],
         capture_output=True, timeout=5
@@ -297,14 +297,13 @@ def main():
 
     # ---- 默认参数 ----
     color = '红'
-    match_mode = '无'       # "和" / "或" / "无"
+    match_mode = '无'
     target_text = ''
     interval = 1.5
     click_count = 0
     running = True
 
     while running:
-        # 读配置
         cfg = read_cfg()
         if cfg.get('cmd') == 'stop':
             running = False
@@ -322,7 +321,7 @@ def main():
 
         try:
             img = screenshot()
-            gray = np.array(img.convert('L'), dtype=np.float32)
+            gray_pil = img.convert('L')
 
             # Step 1 — 颜色区域
             color_regions = find_color(img, color)
@@ -330,27 +329,21 @@ def main():
             text_found = False
             text_rect = None
             if target_text and text_matcher.ready:
-                text_found, text_rect = text_matcher.match_word(gray, target_text)
+                text_found, text_rect = text_matcher.match_word(gray_pil, target_text)
 
             # Step 3 — 根据关联模式决定点击目标
             targets = []
 
             if match_mode == '和':
-                # 必须同时匹配颜色+文字：找颜色区域内的文字
                 if target_text and text_found and text_rect and color_regions:
                     tx, ty, tw, th, _ = text_rect
                     for rx, ry, rw, rh in color_regions:
-                        # 文字矩形与颜色区域有重叠
                         if (tx < rx + rw and tx + tw > rx and
                                 ty < ry + rh and ty + th > ry):
-                            # 在重叠区域中心点击
-                            cx = max(rx, tx) + min(rx + rw, tx + tw) - max(rx, tx)
-                            cy = max(ry, ty) + min(ry + rh, ty + th) - max(ry, ty)
                             targets.append((rx + rw // 2, ry + rh // 2))
                             break
 
             elif match_mode == '或':
-                # 颜色或文字任一匹配即可
                 for rx, ry, rw, rh in color_regions[:5]:
                     targets.append((rx + rw // 2, ry + rh // 2))
                 if not color_regions and text_found and text_rect:
