@@ -32,7 +32,7 @@ jobs:
             libssl-dev libffi-dev wget unzip file git \
             autoconf automake autopoint libtool pkg-config \
             ccache cmake openjdk-17-jdk zlib1g-dev libltdl-dev \
-            libncurses5-dev libncursesw5-dev libtinfo5
+            libncurses-dev
 
       - name: Increase swap space
         run: |
