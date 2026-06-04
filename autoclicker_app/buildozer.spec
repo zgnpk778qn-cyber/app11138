@@ -5,22 +5,24 @@ package.name = autoclicker
 package.domain = org.autoclicker
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
-version = 1.0.2
+version = 1.0.3
 
-# Minimal dependencies — no numpy, no pyjnius
-requirements = python3,kivy,Pillow
+# pyjnius = Android API access for foreground service
+requirements = python3,kivy,Pillow,pyjnius
 
-# Permissions
-android.permissions = INTERNET,SYSTEM_ALERT_WINDOW,FOREGROUND_SERVICE
+# Background service
+services = autoclicker:service/main.py
+
+# Permissions for background operation
+android.permissions = INTERNET,FOREGROUND_SERVICE,POST_NOTIFICATIONS,SYSTEM_ALERT_WINDOW,WAKE_LOCK
 android.api = 34
 android.minapi = 24
 android.ndk = 25b
 android.accept_sdk_license = True
 
-# Only arm64 for faster build
+# Only arm64 for speed
 android.archs = arm64-v8a
 
-# Debug build
 android.release = False
 android.debug = True
 
