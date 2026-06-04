@@ -1,1 +1,0 @@
-# AutoClickerApp - core package
