@@ -1,10 +1,10 @@
 """
-AutoClicker - UI 控制面板，启动/停止后台自动点击服务
+AutoClicker — UI 控制面板
 """
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
 from kivy.uix.label import Label
+from kivy.uix.button import Button
 from kivy.uix.spinner import Spinner
 from kivy.uix.textinput import TextInput
 from kivy.clock import Clock
@@ -15,65 +15,95 @@ KV = '''
 BoxLayout:
     orientation: 'vertical'
     padding: 12
-    spacing: 8
+    spacing: 6
 
+    # ---- 标题 ----
     Label:
         text: 'AutoClicker'
         font_size: '22sp'
         size_hint_y: None
-        height: 44
+        height: 40
 
+    # ---- 颜色 ----
     BoxLayout:
         size_hint_y: None
-        height: 48
+        height: 44
         Label:
-            text: 'Target Color:'
-            size_hint_x: 0.35
+            text: '颜色:'
+            size_hint_x: 0.3
         Spinner:
             id: color_sp
-            text: 'Red'
-            values: ['Red', 'Green', 'Blue', 'Yellow', 'White']
-            size_hint_x: 0.65
+            text: '红'
+            values: ['红', '绿', '蓝', '黄', '白']
+            size_hint_x: 0.7
 
+    # ---- 文字 ----
     BoxLayout:
         size_hint_y: None
-        height: 48
+        height: 44
         Label:
-            text: 'Interval (s):'
-            size_hint_x: 0.35
+            text: '文字:'
+            size_hint_x: 0.3
+        TextInput:
+            id: text_ti
+            text: ''
+            multiline: False
+            hint_text: '是/否/对/错/yes/no/和/或'
+            size_hint_x: 0.7
+
+    # ---- 关联模式 ----
+    BoxLayout:
+        size_hint_y: None
+        height: 44
+        Label:
+            text: '关联:'
+            size_hint_x: 0.3
+        Spinner:
+            id: mode_sp
+            text: '无'
+            values: ['无', '和', '或']
+            size_hint_x: 0.7
+            # 无=仅颜色  和=颜色+文字  或=颜色或文字
+
+    # ---- 间隔 ----
+    BoxLayout:
+        size_hint_y: None
+        height: 44
+        Label:
+            text: '间隔(s):'
+            size_hint_x: 0.3
         TextInput:
             id: interval_ti
             text: '1.5'
             multiline: False
-            size_hint_x: 0.65
+            size_hint_x: 0.7
 
+    # ---- 按钮 ----
     BoxLayout:
         size_hint_y: None
-        height: 56
+        height: 52
         spacing: 10
         Button:
             id: btn_start
             text: 'START'
             on_press: app.toggle_service()
             background_color: 0.2, 0.7, 0.2, 1
-        Button:
-            text: 'OPEN ACCESSIBILITY'
-            on_press: app.open_accessibility()
-            background_color: 0.2, 0.4, 0.7, 1
 
+    # ---- 状态 ----
     Label:
         id: status_lbl
-        text: 'Status: Stopped'
+        text: 'Stopped'
         size_hint_y: None
-        height: 30
-        font_size: '14sp'
+        height: 28
+        font_size: '13sp'
 
+    # ---- 日志 ----
     Label:
         id: log_lbl
         text: ''
         text_size: self.width, None
         size_hint_y: None
-        height: max(200, self.texture_size[1])
+        height: max(180, self.texture_size[1])
 '''
 
 CFG = '/data/data/org.autoclicker.autoclicker/files/service_cfg.txt'
@@ -83,82 +113,75 @@ LOG = CFG + '.log'
 class AutoClickerApp(App):
 
     def build(self):
-        self._poll_event = None
         return Builder.load_string(KV)
 
     def on_start(self):
         self.root.ids.color_sp.bind(text=self._write_cfg)
+        self.root.ids.text_ti.bind(text=self._write_cfg)
+        self.root.ids.mode_sp.bind(text=self._write_cfg)
         self.root.ids.interval_ti.bind(text=self._write_cfg)
         Clock.schedule_interval(self._read_log, 2)
 
     def toggle_service(self):
         btn = self.root.ids.btn_start
         if btn.text == 'START':
-            self._start_service()
+            self._start()
         else:
-            self._stop_service()
+            self._stop()
 
-    def _start_service(self):
+    def _start(self):
         self._write_cfg()
         try:
             from jnius import autoclass
-            service_name = 'org.autoclicker.autoclicker.ServiceAutoclicker'
+            cls = autoclass('org.autoclicker.autoclicker.ServiceAutoclicker')
             mActivity = autoclass('org.kivy.android.PythonActivity').mActivity
-            service_intent = autoclass('android.content.Intent')(mActivity,
-                autoclass(service_name))
-            mActivity.startService(service_intent)
-            self.root.ids.btn_start.text = 'STOP'
-            self.root.ids.btn_start.background_color = (0.7, 0.2, 0.2, 1)
-            self.root.ids.status_lbl.text = 'Status: RUNNING (background)'
+            intent = autoclass('android.content.Intent')(mActivity, cls)
+            mActivity.startService(intent)
+            btn = self.root.ids.btn_start
+            btn.text = 'STOP'
+            btn.background_color = (0.7, 0.2, 0.2, 1)
+            self.root.ids.status_lbl.text = 'RUNNING (background)'
         except Exception as e:
-            self.root.ids.status_lbl.text = f'Start failed: {e}'
+            self.root.ids.status_lbl.text = f'Start err: {e}'
 
-    def _stop_service(self):
+    def _stop(self):
         self._write_cfg(cmd='stop')
         try:
             from jnius import autoclass
+            cls = autoclass('org.autoclicker.autoclicker.ServiceAutoclicker')
             mActivity = autoclass('org.kivy.android.PythonActivity').mActivity
-            service_intent = autoclass('android.content.Intent')(
-                mActivity,
-                autoclass('org.autoclicker.autoclicker.ServiceAutoclicker')
-            )
-            mActivity.stopService(service_intent)
+            intent = autoclass('android.content.Intent')(mActivity, cls)
+            mActivity.stopService(intent)
         except Exception:
             pass
-        self.root.ids.btn_start.text = 'START'
-        self.root.ids.btn_start.background_color = (0.2, 0.7, 0.2, 1)
-        self.root.ids.status_lbl.text = 'Status: Stopped'
+        btn = self.root.ids.btn_start
+        btn.text = 'START'
+        btn.background_color = (0.2, 0.7, 0.2, 1)
+        self.root.ids.status_lbl.text = 'Stopped'
 
     def _write_cfg(self, *args, cmd='start'):
         try:
             color = self.root.ids.color_sp.text
+            text_val = self.root.ids.text_ti.text.strip()
+            mode = self.root.ids.mode_sp.text
             interval = self.root.ids.interval_ti.text
             with open(CFG, 'w') as f:
                 f.write(f'cmd={cmd}\n')
                 f.write(f'color={color}\n')
+                f.write(f'target_text={text_val}\n')
+                f.write(f'match_mode={mode}\n')
                 f.write(f'interval={interval}\n')
         except Exception:
-            pass  # not on Android yet
+            pass
 
     def _read_log(self, dt):
         try:
             if os.path.exists(LOG):
                 with open(LOG) as f:
-                    lines = f.readlines()[-30:]
+                    lines = f.readlines()[-25:]
                 self.root.ids.log_lbl.text = ''.join(lines)
         except Exception:
             pass
-
-    def open_accessibility(self):
-        try:
-            from jnius import autoclass
-            Intent = autoclass('android.content.Intent')
-            Settings = autoclass('android.provider.Settings')
-            mActivity = autoclass('org.kivy.android.PythonActivity').mActivity
-            intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-            mActivity.startActivity(intent)
-        except Exception:
-            self.root.ids.status_lbl.text = 'Cannot open settings'
 
 
 if __name__ == '__main__':

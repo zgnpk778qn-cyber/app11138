@@ -8,7 +8,7 @@ source.include_exts = py,png,jpg,kv,atlas
 version = 1.0.3
 
 # pyjnius = Android API access for foreground service
-requirements = python3,kivy,Pillow,pyjnius
+requirements = python3,kivy,Pillow,numpy,pyjnius
 
 # Background service
 services = autoclicker:service/main.py
